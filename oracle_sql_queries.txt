@@ -1,0 +1,923 @@
+-- Check DB version
+SELECT banner FROM v$version WHERE ROWNUM = 1;
+
+--Create new user - c##homeuser/database
+CREATE USER c##homeuser IDENTIFIED BY database;
+
+--c##homeuser is given admin privileges using GUI
+
+
+--Classification of SQL -- 
+--1) Data Definition Language - Affects structure and metadata of a DB. Like - new DB object creation queries - Table, View or Index creation.
+--    *> CREATE, ALTER, DROP, TRUNCATE, RENAME
+--    *> All DDL statements are Auto-commited. You will not be able to Rollback!
+--    *> Admin privileges are required for DDL statements
+--2) Data Manipulation Language - Affects data inside DB object like INSERT/UPDATE/DELETE queries
+--3) Data Retrieval Language - Data Retrieval queries like SELECT
+--4) Data Control Language - Data accessibility control based on Roles
+--5) Transaction Control Language - Transaction management - Atomic operations, Commit, Rollback
+
+
+--***************************************************************
+-- A] Data Definition Language (DDL) Commands
+
+--CREATE a table
+--> Data Dictionary (System Tables) and User tables
+--> When a table is created, it is created in user's schema
+
+CREATE TABLE employees (
+    EmpId NUMBER,
+    FirstName VARCHAR2(20),
+    LastName VARCHAR2(20),
+    EmailId VARCHAR2(50),
+    Gender CHAR(1),
+    MobileNo CHAR(10),
+    DateOfJoining DATE DEFAULT sysdate,
+    DeptId INT
+);
+
+-- See Table Structure - Describe EMPLOYEES
+desc employees;
+
+-- ALTER a table
+--> ADD/MODIFY/DROP/RENAME columns
+
+-- ADD
+ALTER TABLE employees ADD DateOfBirth DATE;
+
+-- Adding multiple new columns
+-- salary - number(10,2) - Total 10 numbers with 2 decimal places i.e. 8+2
+ALTER TABLE employees ADD (salary NUMBER(10,2), Col1 NUMBER);
+--********************
+-- MODIFY 
+-- Need to take care of exisitng data in DB, Otherwise modification will not be successful
+-- Change Data type of Col1 to VARCHAR2(10)
+ALTER TABLE employees MODIFY Col1 VARCHAR2(10);
+--********************
+--DROP
+-- Dropping a col will delete all col associated data and release memory. During heavy traffic, it can be a performance bottleneck.
+-- Another technique is to set col as unused and later drop all unused cols during lighter traffic.
+
+ALTER TABLE employees SET UNUSED COLUMN salary;
+ALTER TABLE employees DROP UNUSED COLUMNs;
+
+ALTER TABLE employees ADD Col2 NUMBER;
+ALTER TABLE employees DROP COLUMN Col2 ;
+--********************
+-- RENAME Column
+ALTER TABLE employees RENAME COLUMN Col1 TO Col11;
+
+-- See Table Structure - Describe EMPLOYEES
+desc employees;
+
+--********************
+-- DROP and TRUNCATE TABLE
+-- DROP removes table structure and data
+-- TRUNCATE removes data but retains table structure
+
+--********************
+-- RENAME TABLE
+
+ALTER TABLE employees RENAME TO new_employees;
+-- See Table Structure - Describe EMPLOYEES
+desc new_employees;
+
+ALTER TABLE new_employees RENAME TO employees;
+
+--***************************************************************
+-- B] Constraints
+--> Constraint names are optional
+--> Constraints can be added at table-level or column-level
+--> Constraint can be enabled/disabled/dropped
+--> NOT NULL, UNIQUE, PRIMARY KEY, CHECK, FOREIGN KEY
+
+-- NOT NULL - Value must be present. Null value not allowed
+--> NOT NULL - only at col-level not at table-level
+
+CREATE TABLE sample1(
+    Col1 NUMBER CONSTRAINT sample1_col1_nn NOT NULL,
+    Col2 NUMBER NOT NULL
+);
+
+desc sample1;
+
+ALTER TABLE employees MODIFY firstname VARCHAR2(20) CONSTRAINT employeess_firstname_nn NOT NULL;
+
+-- UNIQUE - Value must be Unique.
+--> UNIQUE - col-level or table-level (Checks uniqueness of combination of col values)
+
+
+CREATE TABLE sample2(
+    Col1 NUMBER CONSTRAINT sample2_col1_uq UNIQUE,
+    Col2 NUMBER,
+    Col3 NUMBER,
+    CONSTRAINT sample2_col2_col3_uq UNIQUE(Col2,Col3)
+);
+
+
+desc sample2;
+
+ALTER TABLE employees ADD CONSTRAINT employees_email_uq UNIQUE(EmailId);
+ALTER TABLE employees ADD CONSTRAINT employees_mobile_uq UNIQUE(mobileNo);
+desc employees;
+
+
+-- PRIMARY KEY - Only single col can be a primary key.
+--> PRIMARY KEY = NOT NULL + UNIQUE
+--> col-level or table-level both
+
+-- col-level
+CREATE TABLE sample3(
+Col1 NUMBER CONSTRAINT sample3_pk PRIMARY KEY,
+Col2 NUMBER
+);
+
+-- table-level
+CREATE TABLE sample4(
+Col1 NUMBER,
+Col2 NUMBER,
+CONSTRAINT sample4_pk PRIMARY KEY(Col1)
+);
+
+ALTER TABLE employees ADD CONSTRAINT employees_pk PRIMARY KEY(EMPID);
+
+
+-- CHECK - col can contain values which satisfy specific condition
+--> col-level or table-level both
+
+-- col-level
+CREATE TABLE sample5(
+Col1 NUMBER CONSTRAINT sample5_Col1_check CHECK(Col1 > 1000),
+Col2 NUMBER
+);
+
+-- table-level
+CREATE TABLE sample6(
+Col1 NUMBER,
+Col2 NUMBER,
+CONSTRAINT sample6_Col2_check CHECK(Col2 < 500)
+);
+
+desc sample5;
+desc sample6;
+
+ALTER TABLE employees ADD CONSTRAINT employees_gender_check CHECK (gender IN ('M','F')); 
+
+-- FOREIGN KEY - Referential Integrity
+--> One col should refer to another col in same or different table
+--> Referring col should have only those values which are there in referred col. Referring col can take null values but no value which is NOT present in referred col
+--> It is common practice to have referred col as a primary key and referring col as foreign key.
+
+CREATE TABLE departments (
+    DeptId NUMBER PRIMARY KEY,
+    DeptName VARCHAR(20)
+);
+
+desc departments;
+
+-- Adding FOREIGN KEY in employees table refering to PRIMARY KEY 'DeptId' of departments.
+-- DeptId in employees can have only DeptIds from departments table and NULL.
+-- Foreign key and primary key cols can have different names.
+-- Effect of operations on primary key to foreign key can be defined with 'cascade' keyword.  
+
+-- If DeptId in departments is deleted, set them NULL in employees
+ALTER TABLE employees
+ADD CONSTRAINT emp_dept_rel FOREIGN KEY(DeptId)
+REFERENCES departments(DeptId) ON DELETE SET NULL; 
+
+-- If DeptId in departments is deleted, delete them in employees as well.
+ALTER TABLE employees
+ADD CONSTRAINT emp_dept_rel FOREIGN KEY(DeptId)
+REFERENCES departments(DeptId) ON DELETE CASCADE; 
+
+-- By default, if 'ON DELETE' is not specified then delete operation is not allowed on DeptId in departments table
+ALTER TABLE employees
+ADD CONSTRAINT emp_dept_rel FOREIGN KEY(DeptId)
+REFERENCES departments(DeptId); 
+
+-- Managing Constraints (View/Disable/Enable/Drop)
+-- SYS.user_constraints and SYS.user_cons_columns are system tables or data dictionaries
+
+SELECT constraint_name, constraint_type from SYS.user_constraints
+WHERE table_name='EMPLOYEES';
+
+SELECT constraint_name, column_name from SYS.user_cons_columns
+WHERE table_name='EMPLOYEES';
+
+
+ALTER table employees
+DISABLE CONSTRAINT employees_gender_check;
+
+-- Make sure col data is matching with CONSTRAINT, otherwise opeartion will not be allowed
+ALTER table employees
+ENABLE CONSTRAINT employees_gender_check;
+
+
+ALTER table employees
+DROP CONSTRAINT employees_gender_check;
+
+--***************************************************************
+-- C] Data Manipulation Language (DML)
+--> INSERT/UPDATE/DELETE/MERGE data in a Table
+--> Need Explicit commit/rollback after query execution
+
+--INSERT Data in a table
+--> While inserting data, Maintain same sequence of cols as in table
+--> If you provide col names in INSERT query then you can use any random order of cols.
+--> Take care of data matching data types as in table
+
+-- Note use of DEFAULT keyword for default cols
+INSERT INTO employees VALUES (101, 'John', 'Sharma', 'xyz@point.com', 'M', '9014324444', DEFAULT, null);
+
+-- Note DEFAULT keyword is not required when col names are used and dateofjoining is not included in query
+INSERT INTO employees (empId, lastname, emailId, DeptId, Gender, firstname, mobileno) VALUES (102, 'Verma', 'rew@point.com', null, 'M', 'Kamar', '9017324444');
+COMMIT;
+
+select * from employees;
+
+INSERT INTO departments VALUES (10,'HR');
+INSERT INTO departments VALUES (20,'PAYROLL');
+INSERT INTO departments VALUES (30,'ADMIN');
+
+-- Placeholders Query
+INSERT INTO departments VALUES (&id,&dept);
+COMMIT;
+
+select * from departments;
+
+--UPDATE Data in a table
+
+-- One col update
+UPDATE employees SET deptId = 20 WHERE empId = 101;
+UPDATE employees SET deptId = 30 WHERE empId = 102;
+
+-- Multiple cols update
+
+UPDATE employees SET firstname = 'Ram', mobileno = '4446662345', dateofjoining = '13-SEP-20' WHERE empId = 101;
+
+--DELETE Data in a table
+
+DELETE FROM employees where empId = 102;
+
+--MERGE Data in a table
+--> Conditional insert or update
+
+-- Creating new table copy_emp
+CREATE TABLE copy_emp (
+    EmpId NUMBER,
+    FirstName VARCHAR2(20),
+    LastName VARCHAR2(20),
+    EmailId VARCHAR2(50),
+    DeptId INT
+);
+
+-- First time merge, all employees records are inserted to copy_emp
+-- Second time merge, only chaged data is merged from employees to copy_emp
+
+MERGE into copy_emp c
+USING employees e
+ON (e.empId = c.empId)
+WHEN MATCHED THEN
+UPDATE SET
+c.firstname = e.firstname, 
+c.LastName = e.LastName, 
+c.EmailId = e.EmailId, 
+c.DeptId = e.DeptId
+WHEN NOT MATCHED THEN
+INSERT VALUES (e.empId, e.firstname, e.LastName, e.EmailId, e.DeptId);
+
+select * from employees;
+select * from copy_emp; 
+
+UPDATE employees set deptId = 30 where empId = 101;
+UPDATE employees set deptId = 40 where empId = 102;
+
+MERGE into copy_emp c
+USING employees e
+ON (e.empId = c.empId)
+WHEN MATCHED THEN
+UPDATE SET
+c.firstname = e.firstname, 
+c.LastName = e.LastName, 
+c.EmailId = e.EmailId, 
+c.DeptId = e.DeptId
+WHEN NOT MATCHED THEN
+INSERT VALUES (e.empId, e.firstname, e.LastName, e.EmailId, e.DeptId);
+
+select * from employees;
+select * from copy_emp; 
+
+--***************************************************************
+-- D] Transaction Control Language - Managing Transactions
+--> DDL and DCL are auto-commit and need admin privileges
+--> For DML, transactions need to be managed
+--> For DRL, transactions are not required
+
+--> Transation begins when a first DML statement is executed
+--> Transation ends when - 
+--    a) COMMIT or ROLLBACK is issued
+--    b) DDL or DCL command issued
+--    c) Command editor exits - For graceful exit COMMIT and for abrupt exit ROLLBACK
+--    d) System crashes - ROLLBACK
+
+--> A SAVEPOINT can be placed in the transaction as a marker for ROLLBACK
+--> A SAVEPOINT  is not for COMMIT
+
+-- update commands
+SAVEPOINT updations; -- Checkpoint 1 for rollback
+-- insert commands
+SAVEPOINT insertions; -- Checkpoint 2 for rollback
+-- Other commands
+
+ROLLBACK to insertions; -- Rollback all uncommited Other commands done after SAVEPOINT insertions
+ROLLBACK to updations; -- Rollback all uncommited insert commands done after SAVEPOINT updations
+
+--> Unless table changes are committed, other users can not see the changes. 
+
+--***************************************************************
+-- E] Data Retrieval Language - SELECT 
+--> SELECT clause specifies cols to search
+--> Col search can be modified using expressions
+
+-- Get all cols
+SELECT * from employees;
+
+-- Get selective cols
+SELECT empId, emailId, gender, dateofjoining from employees;
+
+-- Col Expressions - Use '||' for String concatenation
+SELECT empId, (firstname || ' ' || lastname) as FULL_NAME from employees;
+
+-- as keyword is optional for alias
+SELECT empId, (firstname || ' ' || lastname) as FULL_NAME, (salary * 12) as ANUUAL_SALARY from employees;
+
+-- Using DISTINCT 
+SELECT DISTINCT deptid from employees; -- Get Unique deptids
+
+-- Sorting Data
+--> ORDER BY sorts the result - DESC
+--> ORDER BY must be the last clause of the SELECT statement
+--> By default table is sorted on primary key
+--> Default soring is Ascending order. Otherwise mention DESC keyword
+
+--Adding salary col in employees tabel
+
+--ALTER TABLE employees ADD salary NUMBER;
+--
+--INSERT INTO employees VALUES (103, 'Charu', 'Shanti', 'poi@point.com', 'F', '3215438970',DEFAULT,10,2350);
+--INSERT INTO employees VALUES (104, 'Daya', 'Nayak', 'daya@point.com', 'M', '9704561234',DEFAULT,30,12350);
+--INSERT INTO employees VALUES (105, 'Gunjan', 'Tiwari', 'rdc@point.com', 'F', '3215128970',DEFAULT,40,3500);
+--INSERT INTO employees VALUES (106, 'Veera', 'Reddy', 'lop@point.com', 'M', '3256438970',DEFAULT,20,5000);
+--INSERT INTO employees VALUES (107, 'Shanti', 'Priya', 'ams@point.com', 'F', '3215431784',DEFAULT,20,13500);
+--
+--UPDATE employees set salary = 6000 where salary IS NULL;
+
+-- Ordering by col not present in SELECT clause
+SELECT empId, emailId, gender, dateofjoining from employees ORDER BY deptid;
+
+-- Ordering by alias
+SELECT empId, (firstname || ' ' || lastname) as FULL_NAME, (salary * 12) as ANUUAL_SALARY from employees ORDER BY ANUUAL_SALARY DESC;
+
+-- Ordering by order of Col in SELECT Clause
+SELECT empId, (firstname || ' ' || lastname) as FULL_NAME, (salary * 12) as ANUUAL_SALARY from employees ORDER BY 3;
+
+-- ORDER BY on multiple Cols - First priority ANUUAL_SALARY and second Priority lastname
+SELECT empId, (firstname || ' ' || lastname) as FULL_NAME, (salary * 12) as ANUUAL_SALARY from employees ORDER BY ANUUAL_SALARY DESC, lastname DESC;
+--********************
+-- Filtering Data
+--> WHERE clause is used to add filter conditions
+--> Various operators can be used to pass the conditions
+
+--> Comparison Operators = < > etc.
+SELECT * FROM employees WHERE deptid = 20;
+
+--> Logical Operators - and, or, not
+SELECT * FROM employees WHERE deptid = 20 AND gender = 'F';
+
+--> Special Operators - IN, BETWEEN...AND, LIKE, IS NULL
+
+SELECT * FROM employees WHERE deptid IN (10,20,30);
+SELECT * FROM employees WHERE deptid NOT IN (10,20,30);
+
+SELECT * FROM employees WHERE salary BETWEEN 2000 AND 6000 ORDER BY salary ASC;
+
+
+-- LIKE - 
+--> '%' - Zero or multiple chars wildcard
+--> '_' - One char wildcard
+
+-- firstname starting with C
+SELECT * FROM employees WHERE firstname LIKE 'C%';
+
+-- firstname ending with a
+SELECT * FROM employees WHERE firstname LIKE '%a';
+
+-- firstname starting with pattern - One char 'C' followed by exact any 4 chars (_)
+SELECT * FROM employees WHERE firstname LIKE 'C____';
+
+
+INSERT INTO employees VALUES (110, 'Bharti', 'Singh', 'poi4123@point.com', 'F', '3212436970',DEFAULT,10,null);
+
+SELECT * FROM employees WHERE salary = NULL; -- Returns nothing
+SELECT * FROM employees WHERE salary IS NULL; -- Returns 2 rows with null salary
+SELECT * FROM employees WHERE salary IS NOT NULL;
+
+--********************
+--- FUNCTIONS
+--> Single Row Functions - Function is applied on each row and returns multiple values
+--> Multi-Row Function/Group Function - Function is applied on multiple rows but it retunrs a single value
+
+-- Single Row Functions
+--> a) Character Functions
+--> 1) Case Manipulation
+
+-- String comparison in WHERE clause is case sensitive and thus it might hide some data
+-- Solution is to use Case Manipulation functions
+
+SELECT * from employees WHERE lastname = 'Singh'; -- Returns 1 result
+SELECT * from employees WHERE LOWER(lastname) = 'singh'; -- Returns 2 results
+
+SELECT empId, UPPER(firstname) as firstname, UPPER(lastname) as lastname, gender from employees ORDER BY firstname;
+
+-- dual is a dummy table which is used for syntax completion 
+SELECT 'shirish phatangare' from dual;
+SELECT INITCAP('shirish phatangare') from dual; -- First character of each word in uppercase
+--********************
+--> 2) Character Manipulation
+
+SELECT * from employees WHERE LENGTH(lastname) > 5;
+SELECT empId, CONCAT(UPPER(firstname), UPPER(lastname)) as fullname, gender from employees ORDER BY firstname;
+
+-- Little adjustment to add space between firstname and lastname :)
+SELECT empId, CONCAT(RPAD(UPPER(firstname),LENGTH(firstname) + 1 ,' '), UPPER(lastname)) as fullname, gender from employees ORDER BY firstname;
+
+-- Only first 3 chars of mobileNo
+SELECT empId, substr(mobileNo,0,3) from employees;
+
+-- Add padding 
+SELECT empId, RPAD(substr(mobileNo,0,3),10,'*') as Sensitive_data from employees;
+--********************
+--> b) Number Functions
+
+-- Remainder of operation
+SELECT MOD(7,2) FROM dual;
+
+-- ROUND (Adjust limit) and TRUNC (lower limit)
+
+SELECT ROUND(34.5666,2) FROM dual; -- 34.57
+SELECT ROUND(34.5611,2) FROM dual; -- 34.56
+
+SELECT TRUNC(34.5666,2) FROM dual; -- 34.56
+SELECT TRUNC(34.5611,2) FROM dual; -- 34.56
+--********************
+--> c) Date Functions
+
+SELECT sysdate from dual; -- Current Date
+SELECT sysdate + 5 from dual; -- Add 5 Days
+SELECT sysdate - 5 from dual; -- Substract 5 Days
+SELECT sysdate + 14/24 from dual; -- Add 14 Hours
+SELECT TO_DATE('31-DEC-10') - TO_DATE('30-DEC-99') FROM dual; -- Difference in Days - 10 treated as 2010 and 99 treated as 1999
+SELECT MONTHS_BETWEEN('31-DEC-10','30-DEC-99') FROM dual; -- Difference in Months
+SELECT ROUND(MONTHS_BETWEEN('31-DEC-10','30-DEC-99')) FROM dual; -- Difference in Months
+SELECT ADD_MONTHS('30-DEC-99',132) FROM dual;
+SELECT ADD_MONTHS('31-DEC-10',-132) FROM dual;
+SELECT NEXT_DAY('31-DEC-10', 'Monday') FROM dual; -- Next monday from '31-DEC-10'
+--********************
+--> d) Conversion Functions - TO_DATE, TO_CHAR, TO_NUMBER
+
+-- Varchar2 and Char implicitly converts to number or date
+-- Type conversion can also be done explicitly
+
+
+SELECT ROUND(TO_DATE('22-AUG-17'), 'year') FROM dual; -- 01-JAN-18 
+SELECT TRUNC(TO_DATE('22-AUG-17'), 'year') FROM dual; -- 01-JAN-17
+
+SELECT ROUND(TO_DATE('22-AUG-17'), 'month') FROM dual; -- 01-SEP-17 
+SELECT TRUNC(TO_DATE('22-AUG-17'), 'month') FROM dual; -- 01-AUG-17
+
+SELECT TO_CHAR(sysdate,'dd-Month-yyyy') FROM dual;
+SELECT TO_CHAR(sysdate,'dd-Month-yyyy day') FROM dual;
+SELECT TO_CHAR(sysdate,'day') FROM dual;
+SELECT TO_CHAR(sysdate,'HH:MI:SS') FROM dual; -- time
+
+SELECT TO_NUMBER(TO_CHAR(sysdate,'dd')) + 10 FROM dual; -- Add 10 in today's date
+
+SELECT empId, emailId, gender, TO_CHAR(dateofjoining,'day') FROM employees;
+
+-- Why below query not working?
+-- SELECT empId, emailId, gender, dateofjoining FROM employees WHERE LOWER(TO_CHAR(dateofjoining, 'day')) = 'monday';
+--********************
+--> e) General Functions - NVL
+
+-- When Below query is executed we get null values for inhand_salary where commision_pct is null
+SELECT empId, emailId, gender, salary, commision_pct, (salary + (salary * commision_pct)) as inhand_salary FROM employees;
+
+-- NVL(commision_pct,0) will return 0 where commision_pct is null
+-- Data types of NVL args must be same
+SELECT empId, emailId, gender, salary, commision_pct, (salary + (salary * NVL(commision_pct,0))) as inhand_salary FROM employees;
+
+-- NVL2(commision_pct, salary + (salary * commision_pct), salary) - Works like Ternary operator
+SELECT empId, emailId, gender, salary, commision_pct, (NVL2(commision_pct, salary + (salary *commision_pct), salary)) as inhand_salary FROM employees;
+
+-- COALESCE((salary + (salary *commision_pct)), salary, 5000) - Return (salary + (salary *commision_pct)). If (salary + (salary *commision_pct)) is null, return salary. If (salary + (salary *commision_pct)) and salary both null, return 5000
+SELECT empId, emailId, gender, salary, commision_pct, COALESCE((salary + (salary *commision_pct)), salary, 5000) FROM employees;
+
+
+--  Multi-Row Function/Group Function/aggregate function - Single result per group
+--> Perform calculations on a set of values(group) and return single result
+--> COUNT, MAX, MIN, SUM, AVG, STDEV etc.
+
+-- Here 'salary' Col is a group. All below operations are performed on single group per table employees.
+SELECT COUNT(salary),MIN(salary),MAX(salary),ROUND(AVG(salary),4),SUM(salary) from employees;
+
+
+-- Split a table in multiple groups using GROUP BY
+-- We get total salary for each group 
+SELECT deptId, SUM(salary) 
+FROM employees
+GROUP BY deptId -- Group is created on Col deptId
+ORDER BY deptId;
+
+-- Grouping on multiple Cols 
+SELECT deptId, gender, SUM(salary) 
+FROM employees
+GROUP BY deptId, gender  -- Group is created on Cols deptId and gender -- Sequence matters for priority of grouping 
+ORDER BY deptId;
+
+-- For Filtering Group queries, HAVING clause is used. We can not use WHERE clause
+SELECT deptId, gender, SUM(salary) 
+FROM employees
+GROUP BY deptId, gender
+HAVING SUM(salary) >= 13000 
+ORDER BY deptId;
+
+--***************************************************************
+-- F] SubQueries
+--> Query within a query is called Subquery
+--> Inner query executes first and returns the result to outer query
+
+--Single-row Subquery - Inner query returning single row
+--Multi-row Subquery - Inner query returning multiple rows
+
+--Single-row Subquery
+-- Get all employee firstnames and salaries having salary more than 'Dan' 
+SELECT firstname, salary from employees 
+WHERE salary > (
+    SELECT salary from employees
+    WHERE firstname = 'Dan'
+);
+
+UPDATE employees SET salary = salary + 1
+WHERE deptId = (
+    SELECT deptId FROM employees 
+    WHERE firstname = 'Charu'
+);
+
+
+--Multi-row Subquery
+-- <ALL
+
+SELECT firstname, lastname, salary from employees 
+WHERE salary <ALL (
+    SELECT salary from employees
+    WHERE LOWER(lastname) = 'singh' -- INNER query returns multiple results
+);
+
+-- >ANY
+
+SELECT firstname, lastname, salary from employees 
+WHERE salary >ANY (
+    SELECT salary from employees
+    WHERE LOWER(lastname) = 'singh' -- INNER query returns multiple results
+);
+
+
+-- Get details of employee having second highest salary
+SELECT firstname, lastname, salary from employees 
+WHERE salary = (
+    SELECT MAX(salary) FROM employees
+    WHERE salary < (
+        SELECT MAX(salary) FROM employees
+    )
+);
+
+
+--***************************************************************
+-- G] JOINS
+-->Retrieving data from multiple tables
+--> At least one common col must be there to create a Join
+--> Inner Join (EquiJoin and Non-EquiJoin) - Common records from both tables. 
+--> EquiJoin uses equality operator for Join condition. Non-EquiJoin uses other operators for Join condition.
+--> Outer Join (Left Outer Join and Right Outer Join)
+--> Left Outer Join - All the records from the Left table but only matched records from right table
+--> Right Outer Join - All the records from the Right table but only matched records from Left table 
+--> Self Join - A table is joined to itself. Get data from multiple entities in a single table. For e.g. employees table can have manager col. There will be 2 entities Worker and Manager
+
+--Changing employees and departments table structure
+
+ALTER TABLE departments ADD manager_id NUMBER(6);
+ALTER TABLE departments ADD location_id NUMBER(4);
+
+
+ALTER TABLE employees ADD manager_id NUMBER(6);
+ALTER TABLE employees ADD commision_pct NUMBER(2,2);
+
+
+desc employees;
+desc departments;
+
+-- Below query gives Cartesian product of all the records in employees and departments 
+SELECT empId, firstname, deptname 
+FROM employees, departments;
+
+
+-- INNER JOIN - Selects records that have matching values in both tables.
+-- INNER JOIN (EquiJoin) on employees and departments
+SELECT empId, firstname, deptname 
+FROM employees, departments
+WHERE employees.deptId = departments.deptId;
+
+-- Same above query with aliases
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e, departments d
+WHERE e.deptId = d.deptId;
+
+-- INNER JOIN another syntax
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e 
+INNER JOIN departments d
+ON e.deptId = d.deptId;
+
+-- INNER JOIN with 'USING' clause
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e 
+INNER JOIN departments d
+USING (deptId) ;
+--********************
+-- LEFT OUTER JOIN/LEFT JOIN - All records from the left table (table1), and the matched records from the right table (table2). 
+-- '+' on common(deficient) side i.e. RIGHT
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e, departments d
+WHERE e.deptId = d.deptId(+);
+
+-- LEFT OUTER JOIN - Another syntax
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e
+LEFT JOIN departments d
+ON e.deptId = d.deptId;
+--WHERE condition; 
+
+-- LEFT OUTER JOIN with 'USING' clause
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e
+LEFT OUTER JOIN departments d
+USING (deptId) ;
+
+-- RIGHT OUTER JOIN/RIGHT JOIN - All records from the right table (table2), and the matched records from the left table (table1). 
+-- '+' on common(deficient) side i.e. LEFT
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e, departments d
+WHERE e.deptId(+) = d.deptId;
+
+-- RIGHT OUTER JOIN - Another syntax
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e
+RIGHT JOIN departments d
+ON e.deptId = d.deptId;
+--WHERE condition; 
+
+-- RIGHT OUTER JOIN with 'USING' clause
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e
+RIGHT OUTER JOIN departments d
+USING (deptId) ;
+
+
+-- FULL OUTER JOIN/FULL JOIN - All records from both tables when there is a match in left (table1) or right (table2) table records.
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e 
+FULL JOIN departments d
+ON e.deptId = d.deptId;
+--WHERE condition;
+
+-- FULL OUTER JOIN with 'USING' clause
+SELECT e.empId, e.firstname, d.deptname 
+FROM employees e
+FULL OUTER JOIN departments d
+USING (deptId) ;
+--********************
+
+-- SELF JOIN - Manager and Worker Data in same employees table
+SELECT w.firstname as Worker, m.firstname as Manager
+FROM employees w, employees m
+WHERE w.manager_Id = m.empId;
+
+-- CROSS JOIN and NATURAL JOIN are not covered here
+
+--***************************************************************
+-- H] MISC TOPICS
+--********************
+--a) Creating Sequences
+--> Automatically generate unique numbers
+--> Used to create primary key value
+--> Can be shared
+
+CREATE TABLE sample (
+    Col1 NUMBER(3) PRIMARY KEY,
+    Col2 VARCHAR2(20)
+);
+
+CREATE SEQUENCE sample_col1_gen
+START WITH 100
+INCREMENT BY 1
+MAXVALUE 1000 -- default NOMAXVALUE
+CYCLE -- default NOCYCLE
+CACHE 10; -- default NOCACHE
+
+desc SYS.user_sequences;
+
+SELECT * FROM SYS.user_sequences 
+WHERE LOWER(SEQUENCE_NAME) = 'sample_col1_gen';
+
+-- Current status of SEQUENCE sample_col1_gen
+SELECT sample_col1_gen.CURRVAL, sample_col1_gen.NEXTVAL FROM dual;
+
+-- Inserting values in table with SEQUENCE sample_col1_gen
+
+INSERT INTO sample VALUES (sample_col1_gen.NEXTVAL, 'aaa'); 
+INSERT INTO sample VALUES (sample_col1_gen.NEXTVAL, 'bbb'); 
+
+SELECT * from sample;
+
+-- Current status of SEQUENCE sample_col1_gen
+SELECT sample_col1_gen.CURRVAL, sample_col1_gen.NEXTVAL FROM dual;
+--********************
+--b) Creating Index
+--> DB index acts like an index of a book
+--> It speeds up data retrieval
+--> Should be created on fields having no keys (PRIMARY KEY or UNIQUE)
+--> PRIMARY KEY or UNIQUE Cols are automatically indexed
+--> Should be created when very less no. of rows to be retrieved in a large table
+
+-- Below index is used by Oracle server when firstname is specific in WHERE clause condition
+CREATE INDEX emp_firstname_idx
+ON employees(firstname);
+
+
+-- c) Creating Synonyms
+--> Provides easy way to access the table owned by another user
+--> Shortens lengthy table name
+
+-- Local Synonym to current user
+CREATE SYNONYM emp FOR employees;
+SELECT * FROM emp;
+
+-- Synonym for Accessing table from other schema/user
+CREATE SYNONYM seq FOR SYS.user_sequences;
+SELECT * from seq;
+--********************
+-- d) Creating users
+-- It is better to use below commnads on command-prompt.
+
+--Create new user - c##sample_user/database123
+CREATE USER c##sample_user IDENTIFIED BY database123;
+
+-- Grant/revoke permissions to new user
+-- PUBLIC keyword can be used to assign permission to all users. 
+-- Multiple users can be separated by comma
+-- Permissions can be grated to roles as well
+-- System privileges
+GRANT CREATE SESSION, CREATE TABLE, CREATE VIEW, CREATE SYNONYM to c##sample_user; 
+REVOKE CREATE VIEW FROM c##sample_user; 
+
+-- Object privileges
+GRANT SELECT, UPDATE, INSERT, DELETE ON departments to c##sample_user;
+REVOKE DELETE ON departments FROM c##sample_user;
+
+-- Grant update permission on specific Col 'deptName' of departments table under admin account
+GRANT UPDATE(deptName) ON departments TO c##sample_user;
+
+--Login as new user c##homeuser
+CONN c##sample_user;
+CONN c##sample_user/database123;
+
+-- Will show current logged in user
+SHOW USER; 
+
+--********************
+-- e) Data Control Language - Data accessibility control based on Roles
+--> Managing Roles
+--> Managing accessibility for individual users can be challenging. 
+--> Managing accessibility for roles is convenient.
+--> Multiple users can be assigned to a role
+
+-- Create a new role
+CREATE ROLE role_manager;
+
+-- System privileges to role
+GRANT CREATE SESSION, CREATE TABLE, CREATE VIEW, CREATE SYNONYM to role_manager; 
+
+-- Object privileges to role
+GRANT SELECT, UPDATE to role_manager; 
+REVOKE UPDATE FROM role_manager; 
+
+-- Assign role to the user
+GRANT role_manager to c##sample_user;
+
+--********************
+-- f) Creating Views
+--> Views provide different views for different set of users
+--> Users are granted access to view and not a table
+--> View is a virtual table
+--> View will not contain actual data. Just a SELECT statement for table data.
+--> Every time a view is accessed, select query on table is executed to return the recent table data.
+--> When table data is updated, views will reflect it immediately.
+--> Provides restricted access to table data
+--> DML on a table can be performed through views with below exceptions.
+
+
+--1) Dont's for DELETE
+--> If View SELECT statement contains DISTICT KEYWORD/GROUP FUNCTION/GROUP BY CLAUSE, then DELETE on table through view is not possible.
+
+--2) Dont's for UPDATE
+--> If View SELECT statement contains DISTICT KEYWORD/GROUP FUNCTION/GROUP BY CLAUSE/EXPRESSION, then UPDATE on table through view is not possible.
+
+--3) Dont's for INSERT
+--> If View SELECT statement contains DISTICT KEYWORD/GROUP FUNCTION/GROUP BY CLAUSE/EXPRESSION/NOT NULL COL EXCLUDED IN VIEW, then INSERT on table through view is not possible.
+
+
+-- Validating DML operations on VIEW
+--> DML operation on table through view can be validated by using WITH CHECK OPTION
+--> DML operation on table through view can be restricted by using WITH READ ONLY
+
+
+-- View showing only records of deptId 10
+-- REPLACE makes it convenient to update view definition later (just change view select quety)
+
+CREATE OR REPLACE VIEW emp_view AS
+SELECT empId, firstname || ' ' || lastname as Emp_Fullname, emailId, salary, deptId
+FROM employees
+WHERE deptId = 10;
+
+SELECT * FROM emp_view;
+
+desc SYS.user_views; -- user_views system table
+
+-- Get SELECT query for view from SYS.user_views
+SELECT text FROM SYS.user_views WHERE LOWER(VIEW_NAME) = 'emp_view';
+
+
+-- DELETE on employees through emp_view is possible
+DELETE FROM emp_view WHERE empId = 103; -- Rollback is possible
+
+-- UPDATE on salary Col of employees through emp_view is possible
+UPDATE emp_view SET salary = 5000 WHERE empId = 103;
+
+--UPDATE on EMP_FULLNAME expression Col through emp_view is NOT possible
+UPDATE emp_view SET EMP_FULLNAME = 'ANADI GOYAL' WHERE empId = 103; -- Fails!
+
+
+-- Below update on deptId succeds, but this row is removed from view as it no longer satisfies View SELECT condition.
+UPDATE emp_view SET deptId = 20 WHERE empId = 103; 
+
+-- Above scenario can be prevented by adding WITH CHECK OPTION in view definition
+CREATE OR REPLACE VIEW emp_view AS
+SELECT empId, firstname || ' ' || lastname as Emp_Fullname, emailId, salary, deptId
+FROM employees
+WHERE deptId = 10
+WITH CHECK OPTION;
+
+-- Below update on deptId fails due to WITH CHECK OPTION validation. Only operations on deptId=10 possible
+UPDATE emp_view SET deptId = 30 WHERE empId = 110; 
+
+-- WITH READ ONLY Validation. No DML operation is possible on any view data
+CREATE OR REPLACE VIEW emp_view AS
+SELECT empId, firstname || ' ' || lastname as Emp_Fullname, emailId, salary, deptId
+FROM employees
+WHERE deptId = 10
+WITH READ ONLY;
+
+DELETE FROM emp_view WHERE empId = 110; 
+
+
+--****************************END-OF-NOTES***********************************
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

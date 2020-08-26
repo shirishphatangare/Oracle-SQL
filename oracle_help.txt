@@ -1,0 +1,135 @@
+
+Oracle local installation Details
+
+Download and Install Oracle DB and Oracle SQL developer from oracle.com 
+
+Global Db name(SID): orcle
+
+Below password is used for both SYS and SYSTEM admin accounts
+password: database!23
+
+Oracle Enterprise Manager Database Express URL: https://localhost:5500/em
+
+----------------------------------------------------------------------
+
+system is username and sysdba is role
+Connect to DB using user 'system' and DB password --
+
+C:\Users\Shirish>sqlplus
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Mon Aug 24 05:56:46 2020
+Version 19.3.0.0.0
+
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
+
+Enter user-name: system
+Enter password:
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.3.0.0.0
+
+----------------------------------------------------------------------
+
+Connect to DB with system privilieges (won't ask for username and password)
+
+C:\Users\Shirish>sqlplus / as sysdba
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Mon Aug 24 06:06:28 2020
+Version 19.3.0.0.0
+
+Copyright (c) 1982, 2019, Oracle.  All rights reserved.
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.3.0.0.0
+
+----------------------------------------------------------------------
+'conn sys as sysdba' also can be used
+
+SQL> connect sys as sysdba
+Enter password:
+Connected.
+
+----------------------------------------------------------------------
+
+SQL> conn  c##homeuser
+Enter password:
+Connected.
+SQL> show user
+USER is "C##HOMEUSER"
+
+----------------------------------------------------------------------
+
+'disc' command also can be used to disconnect from Oracle DB.
+
+SQL> exit
+Disconnected from Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.3.0.0.0
+
+----------------------------------------------------------------------
+
+SQL> SHUTDOWN
+Database closed.
+Database dismounted.
+ORACLE instance shut down.
+
+----------------------------------------------------------------------
+
+SQL> STARTUP
+ORACLE instance started.
+
+Total System Global Area 3841979264 bytes
+Fixed Size                  9274240 bytes
+Variable Size             788529152 bytes
+Database Buffers         3036676096 bytes
+Redo Buffers                7499776 bytes
+Database mounted.
+Database opened.
+
+----------------------------------------------------------------------
+Tips --
+
+While using command-line to write SQL queries 'ed' command can be very handy to edit last entered command
+
+----------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
